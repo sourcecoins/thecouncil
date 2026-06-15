@@ -1,4 +1,5 @@
 [build]
+  command = "mkdir -p public"
   publish = "public"
   functions = "netlify/functions"
 
