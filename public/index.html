@@ -108,7 +108,7 @@ nav{display:flex;align-items:center;justify-content:space-between;padding:18px 3
 .suggestion-cards{display:flex;flex-direction:column;gap:7px;margin:10px 0 4px;}
 .suggestion-card{background:var(--gold-dim);border:1px solid var(--border-gold);border-radius:var(--radius-sm);padding:10px 12px;cursor:pointer;transition:all 0.2s;display:flex;align-items:flex-start;gap:10px;}
 .suggestion-card:hover{background:rgba(212,175,55,0.18);}
-.suggestion-card.already-selected{opacity:0.4;cursor:default;pointer-events:none;}
+.suggestion-card.already-selected{opacity:0.6;cursor:pointer;}
 .suggestion-card-emoji{font-size:18px;flex-shrink:0;margin-top:1px;}
 .suggestion-card-name{font-family:'EB Garamond',serif;font-size:14px;font-weight:500;color:var(--gold-light);margin-bottom:2px;}
 .suggestion-card-reason{font-family:'Inter',sans-serif;font-size:10px;color:var(--text-mid);line-height:1.45;}
@@ -1030,7 +1030,7 @@ async function runSuggestion(challenge, container, fromHome) {
   try {
     const resp = await fetch('/.netlify/functions/claude', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', },
       body: JSON.stringify({
         model: 'claude-sonnet-4-6',
         max_tokens: 400,
@@ -1066,11 +1066,11 @@ async function runSuggestion(challenge, container, fromHome) {
         suggestions.map(s => {
           const mind = MINDS.find(m => m.id === s.id);
           const alreadySel = selected.includes(s.id);
-          return '<div class="suggestion-card' + (alreadySel ? ' already-selected' : '') + '" onclick="addSuggested(\'' + s.id + '\',' + fromHome + ')">'
+          return '<div class="suggestion-card' + (alreadySel ? ' already-selected' : '') + '" onclick="addSuggested(\'' + s.id + '\',' + fromHome + ')" style="' + (alreadySel ? 'opacity:0.7;border-color:var(--gold)' : '') + '">'
             + '<div class="suggestion-card-emoji">' + mind.emoji + '</div>'
             + '<div style="flex:1;min-width:0">'
             + '<div class="suggestion-card-name">' + mind.name + '</div>'
-            + '<div class="suggestion-card-reason">' + escapeHtml(s.reason) + '</div>'
+            + '<div class="suggestion-card-reason">' + (alreadySel ? 'Tap to remove' : escapeHtml(s.reason)) + '</div>'
             + '</div>'
             + '<div class="suggestion-card-add">' + (alreadySel ? '✓' : '+') + '</div>'
             + '</div>';
@@ -1082,9 +1082,30 @@ async function runSuggestion(challenge, container, fromHome) {
 }
 
 function addSuggested(id, fromHome) {
-  if (selected.includes(id)) return;
-  if (selected.length >= 4) { showToast('Council is full — max 4 advisors'); return; }
   const mind = MINDS.find(m => m.id === id);
+
+  // Toggle — if already selected, remove it
+  if (selected.includes(id)) {
+    selected = selected.filter(s => s !== id);
+    document.querySelectorAll('.suggestion-card').forEach(card => {
+      if ((card.getAttribute('onclick') || '').includes("'" + id + "'")) {
+        card.classList.remove('already-selected');
+        const addEl = card.querySelector('.suggestion-card-add');
+        if (addEl) addEl.textContent = '+';
+      }
+    });
+    if (mind) showToast(mind.name + ' removed');
+    if (fromHome) {
+      const submitBtn = document.getElementById('homeSubmitBtn');
+      if (submitBtn) submitBtn.textContent = selected.length > 0 ? 'Ask TheCouncil (' + selected.length + ' selected) →' : 'Ask The Council →';
+    } else {
+      renderMindList(document.getElementById('mindSearch')?.value || '');
+      renderCouncilPreview(); updateConveneBtn();
+    }
+    return;
+  }
+
+  if (selected.length >= 4) { showToast('Council is full — tap an advisor to remove them first'); return; }
   selected.push(id);
 
   // Mark cards as selected
@@ -1228,7 +1249,7 @@ async function conveneCouncil() {
       try {
         const retryResp = await fetch('/.netlify/functions/claude', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+          headers: { 'Content-Type': 'application/json', },
           body: JSON.stringify({
             model: 'claude-sonnet-4-6',
             max_tokens: 1000,
